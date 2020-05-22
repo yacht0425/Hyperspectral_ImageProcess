@@ -453,8 +453,7 @@ def FirstDirection(firstimagefile,gpsfile): #最初の角度yawはこれ！
     #translate epoch time into local time
     local_time = datetime.datetime.fromtimestamp(time)
     #print('fileTime: %s' % local_time)
-    s_local_time = str(local_time)
-    need = s_local_time[:21] #until 21 is the required time strings 
+    s_local_time = str(local_time) 
     #print('fileTimeSearch: %s' % need)
     
     #open a gps file
@@ -463,11 +462,16 @@ def FirstDirection(firstimagefile,gpsfile): #最初の角度yawはこれ！
         line_list = f.readlines()
     #print(line_list)
     #Extract lines consistent with 'need' from line_list        
-    required_lines = [line.strip() for line in line_list if need in line]
-    number = len(required_lines)
-    #print(number)
+    i = 22
+    while True:
+        need = s_local_time[:i] #until 21 is the required time strings
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
+        
     median = number // 2
-    #print(median)
     required_line = str(required_lines[median])
     #print('gpsTime: %s' % required_line[1:24])
     N = required_line[43:56]
@@ -518,7 +522,6 @@ def firstYaw(firstimagefile,imufile): #Yaw関数のために使う
     local_time = datetime.datetime.fromtimestamp(time)
     #print('fileTime: %s' % local_time)
     s_local_time = str(local_time)
-    need = s_local_time[:21] #until 21 is the required time strings 
     #print('fileTimeSearch: %s' % need)
     
     #open a imu file
@@ -527,8 +530,14 @@ def firstYaw(firstimagefile,imufile): #Yaw関数のために使う
         line_list = f.readlines()
     
     #abstract lines consistent with 'need' from line_list        
-    required_lines = [line.strip() for line in line_list if need in line]
-    number = len(required_lines)
+    i = 22
+    while True:
+        need = s_local_time[:i] #until 21 is the required time strings 
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
     median = number // 2
     required_line = str(required_lines[median])
     #print('imuTime: %s' % required_line[1:24])
@@ -547,7 +556,6 @@ def Yaw(imagefile,imufile,initialDirection,initialYaw):
     local_time = datetime.datetime.fromtimestamp(time)
     #print('fileTime: %s' % local_time)
     s_local_time = str(local_time)
-    need = s_local_time[:21] #until 21 is the required time strings 
     #print('fileTimeSearch: %s' % need)
     
     #open a imu file
@@ -556,8 +564,14 @@ def Yaw(imagefile,imufile,initialDirection,initialYaw):
         line_list = f.readlines()
     
     #abstract lines consistent with 'need' from line_list        
-    required_lines = [line.strip() for line in line_list if need in line]
-    number = len(required_lines)
+    i = 22
+    while True:
+        need = s_local_time[:i] #until 21 is the required time strings 
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
     median = number // 2
     required_line = str(required_lines[median])
     #print('imuTime: %s' % required_line[1:24])
