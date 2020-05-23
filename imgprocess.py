@@ -343,6 +343,68 @@ def makecsv_d1(ls1,filename):
         
     return 0
 
+def gain_RGB(directory,filename,r,g,b):
+    #Open first image files to decide gain
+    os.chdir(directory)
+    f = open(filename,'rb') #Read binary data
+    dbuf = np.fromfile(f,dtype=np.uint16,count=-1) #Assign the format
+    f.close()
+    dlc=dbuf.reshape(1024,151,1280) #Reshape (y,L,x)
+    img_list = np.array(dlc) #Convert array to np.array
+    
+    img_r = img_list[:,r,:]
+    img_g = img_list[:,g,:]
+    img_b = img_list[:,b,:]
+    
+    print(np.max(img_r))
+    print(np.max(img_g))
+    print(np.max(img_b))
+    
+    reimg_r = img_r.transpose(1,0) #Switch x,y axis
+    reimg_g = img_g.transpose(1,0) 
+    reimg_b = img_b.transpose(1,0) 
+    
+    image_RGB = np.concatenate([[reimg_b],[reimg_g],[reimg_r]]) #Get together r,g,b
+    image_RGB = image_RGB.transpose(2,1,0)  #Switch y axis for wavelength L
+    
+    #Corresponding to the image brightness, gain is changed.
+    threshold = np.max(image_RGB)
+    gain = 4000 / threshold
+    print('gain = %f' %gain)
+    
+    return gain
+
+def copy_RGB(directory,filename,r,g,b):
+    #Open first image files to decide gain
+    os.chdir(directory)
+    f = open(filename,'rb') #Read binary data
+    dbuf = np.fromfile(f,dtype=np.uint16,count=-1) #Assign the format
+    f.close()
+    dlc=dbuf.reshape(1024,151,1280) #Reshape (y,L,x)
+    img_list = np.array(dlc) #Convert array to np.array
+    
+    img_r = img_list[:,r,:]
+    img_g = img_list[:,g,:]
+    img_b = img_list[:,b,:]
+    
+    print(np.max(img_r))
+    print(np.max(img_g))
+    print(np.max(img_b))
+    
+    reimg_r = img_r.transpose(1,0) #Switch x,y axis
+    reimg_g = img_g.transpose(1,0) 
+    reimg_b = img_b.transpose(1,0) 
+    
+    image_RGB = np.concatenate([[reimg_b],[reimg_g],[reimg_r]]) #Get together r,g,b
+    image_RGB = image_RGB.transpose(2,1,0)  #Switch y axis for wavelength L
+    
+    #Corresponding to the image brightness, gain is changed.
+    threshold = np.max(image_RGB)
+    gain = 4000 / threshold
+    image_RGB = image_RGB * gain
+    
+    return image_RGB
+
 #abstract a projection at a bottom centre point in a image from a gps file
 def projection(imagefile,gpsfile,OffsetDistance,OffsetAngle):
     #get the file time
@@ -443,6 +505,80 @@ def imageCoordinate(imagefile,gpsfile,offsetDistance,offsetAngle,scanrate,velo):
     '''
     return upperleftN,upperleftE,bottomrightN,bottomrightE
     
+
+def BigDirection(firstimagefile,lastimagefile,gpsfile): #最初の角度yawはこれ！
+    #get the file time
+    name_first = firstimagefile
+    name_last = lastimagefile
+    time_first = os.path.getmtime(name_first)
+    time_last = os.path.getmtime(name_last)
+    #translate epoch time into local time
+    local_time_first = datetime.datetime.fromtimestamp(time_first)
+    local_time_last = datetime.datetime.fromtimestamp(time_last)
+    #print('fileTime: %s' % local_time)
+    s_local_time_first = str(local_time_first) 
+    s_local_time_last = str(local_time_last) 
+    #print('fileTimeSearch: %s' % need)
+    
+    #open a gps file
+    gps = gpsfile
+    with open(gps) as f:
+        line_list = f.readlines()
+    #print(line_list)
+    #Extract lines consistent with 'need' from line_list
+    i = 22
+    while True:
+        need = s_local_time_first[:i] #until 21 is the required time strings
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
+    median = number // 2
+    required_line = str(required_lines[median])
+    #print('gpsTime: %s' % required_line[1:24])
+    N = required_line[43:56]
+    E = required_line[59:72]
+    fN = float(N)
+    fE = float(E)
+    ddddN = (fN/100 - 43) * 5 / 3 + 43
+    ddddE = (fE/100 - 141) * 5 / 3 + 141
+    #print('(X1,Y1) = (%f,%f)' %(ddddN,ddddE))
+    
+    i = 22
+    while True:
+        need = s_local_time_last[:i] #until 21 is the required time strings
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
+    median = number // 2
+    required_line = str(required_lines[median])
+    #print('gpsTime: %s' % required_line[1:24])
+    laterN = required_line[43:56]
+    laterE = required_line[59:72]
+    laterfN = float(laterN)
+    laterfE = float(laterE)
+    laterddN = (laterfN/100 - 43) * 5 / 3 + 43
+    laterddE = (laterfE/100 - 141) * 5 / 3 + 141
+    #print('(X2,Y2) = (%f,%f)' % (laterddN, laterddE))
+    
+    convertor = Proj(proj='utm',zone=54,ellps='GRS80')
+    utm_ddddX, utm_ddddY = convertor(ddddE,ddddN)
+    utm_laterddX, utm_laterddY = convertor(laterddE,laterddN)
+    #print(utm_ddddX,utm_ddddY)
+    #print(utm_laterddX,utm_laterddY)
+    dif_x = abs(utm_ddddX - utm_laterddX)
+    dif_y = abs(utm_ddddY - utm_laterddY)
+    #print('distance between X1 and X2: %f m' % dif_x)
+    #print('distance between Y1 and Y2: %f m' % dif_y)
+    thete = np.arctan2(dif_x,dif_y)
+    #print(thete)
+    degree = (thete * 180) / np.pi 
+    
+    
+    return degree
 
 #Extract direction in the first image from a gps file
 def FirstDirection(firstimagefile,gpsfile): #最初の角度yawはこれ！
@@ -645,6 +781,46 @@ def rotation(img,degree,scanrate,velo,width):
     new = cv2.merge((r_channel,g_channel,b_channel,alpha))
     
     return new
+
+def big_rotation(img,degree,x_pixel,y_pixel):    
+    
+    #assign w and h pixels
+    w = x_pixel
+    h = y_pixel
+    h_after = int(round(np.sqrt(np.power(w/2,2) + np.power(h/2,2)) * 2))
+    w_after = int(round(np.sqrt(np.power(w/2,2) + np.power(h/2,2)) * 2))
+    size_after = (w_after,h_after)
+    
+    #assign rotation center to image center 
+    center = (w/2,h/2)
+    scale = 1.0
+    rotation_matrix = cv2.getRotationMatrix2D(center,degree,scale)
+    
+    #transportation matrix
+    affine_matrix = rotation_matrix.copy()
+    affine_matrix[0][2] = affine_matrix[0][2] - w/2 + w_after/2
+    affine_matrix[1][2] = affine_matrix[1][2] - h/2 + h_after/2
+    
+    img_affine = cv2.warpAffine(img,affine_matrix, size_after,flags=cv2.INTER_CUBIC)
+    
+    r_channel = img_affine[:,:,0]
+    g_channel = img_affine[:,:,1]
+    b_channel = img_affine[:,:,2]
+    
+    #make alpha channel
+    alpha = np.ones(b_channel.shape[:2], np.uint8) * 255
+    for i in range(w_after):
+        for j in range(w_after):    
+            if r_channel[i][j] == 0:
+                if g_channel[i][j] == 0:
+                    if b_channel[i][j] == 0:
+                        alpha[i][j] = 0
+    
+    #concatenate r, g, b and alpha channel
+    new = cv2.merge((r_channel,g_channel,b_channel,alpha))
+    
+    return new
+
 
 def makeRGBA(filename,degree,imagename,brightness):    
     #read a file
