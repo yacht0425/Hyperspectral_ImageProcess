@@ -25,7 +25,6 @@ directory_image_rotated = 'D:\\Vebots\\My_master_research\\HSC\\hsc20200521wheat
 imu = 'D:\\Vebots\\My_master_research\\HSC\\hsc20200521wheat_daytime\\raw\\imu.txt' 
 gps = 'D:\\Vebots\\My_master_research\\HSC\\hsc20200521wheat_daytime\\raw\\gps.txt' 
 scanrate = 110
-velocity = 0.3
 width = 1.0
 
 
@@ -37,6 +36,8 @@ flen = len(HS_files)
 print(flen)
 initial_degree = ip.FirstDirection(HS_files[0],gps) #initial degree means initial yaw using rotation
 initial_yaw = ip.firstYaw(HS_files[0],imu) #This is for yaw angle from second image on
+velocity = ip.speed(HS_files[0],HS_files[163],gps)
+print('velocity is %f' %velocity)
 
 #Read png image
 os.chdir(directory_image)
@@ -45,6 +46,8 @@ ndvi = cv2.imread('%s.png' %initial)
 ndvi = cv2.rotate(ndvi,cv2.ROTATE_180) #I don't know why but completed images are opposite so modify here
 
 #Give rotation angle to the png image
+os.chdir(directory_all_HS)
+velocity = ip.speed(HS_files[0],HS_files[1],gps)
 rotated_ndvi = ip.rotation(ndvi,initial_degree,scanrate,velocity,width)
 
 os.chdir(directory_image_rotated)
