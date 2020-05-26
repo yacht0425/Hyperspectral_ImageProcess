@@ -504,6 +504,79 @@ def imageCoordinate(imagefile,gpsfile,offsetDistance,offsetAngle,scanrate,velo):
     #print(bottomrightE)
     '''
     return upperleftN,upperleftE,bottomrightN,bottomrightE
+
+def speed(InitialImagefile,LastImagefile,gpsfile): #最初の角度yawはこれ！
+    #get the file time
+    initial_time = os.path.getmtime(InitialImagefile)
+    last_time = os.path.getmtime(LastImagefile)
+    
+    #translate epoch time into local time
+    initial_local_time = datetime.datetime.fromtimestamp(initial_time)
+    last_local_time = datetime.datetime.fromtimestamp(last_time)
+    #print('fileTime: %s' % local_time)
+    s_initial_local_time = str(initial_local_time) 
+    s_last_local_time = str(last_local_time) 
+    #print('fileTimeSearch: %s' % need)
+    
+    #open a gps file
+    gps = gpsfile
+    with open(gps) as f:
+        line_list = f.readlines()
+    #print(line_list)
+    #Extract lines consistent with 'need' from line_list        
+    i = 22
+    while True:
+        need = s_initial_local_time[:i] #until 21 is the required time strings
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
+    median = number // 2
+    required_line = str(required_lines[median])
+    #print('gpsTime: %s' % required_line[1:24])
+    N = required_line[43:56]
+    E = required_line[59:72]
+    fN = float(N)
+    fE = float(E)
+    ddddN = (fN/100 - 43) * 5 / 3 + 43
+    ddddE = (fE/100 - 141) * 5 / 3 + 141
+    #print('(X1,Y1) = (%f,%f)' %(ddddN,ddddE))
+    
+    i = 22
+    while True:
+        need = s_last_local_time[:i] #until 21 is the required time strings
+        required_lines = [line.strip() for line in line_list if need in line]
+        number = len(required_lines)
+        i = i - 1
+        if number != 0:
+            break
+    median = number // 2
+    required_line = str(required_lines[median])
+    #print('gpsTime: %s' % required_line[1:24])
+    laterN = required_line[43:56]
+    laterE = required_line[59:72]
+    laterfN = float(laterN)
+    laterfE = float(laterE)
+    laterddN = (laterfN/100 - 43) * 5 / 3 + 43
+    laterddE = (laterfE/100 - 141) * 5 / 3 + 141
+    
+    convertor = Proj(proj='utm',zone=54,ellps='GRS80')
+    utm_ddddX, utm_ddddY = convertor(ddddE,ddddN)
+    utm_laterddX, utm_laterddY = convertor(laterddE,laterddN)
+    #print(utm_ddddX,utm_ddddY)
+    #print(utm_laterddX,utm_laterddY)
+    dif_x = abs(utm_laterddX - utm_ddddX) 
+    dif_y = abs(utm_laterddY - utm_ddddY) 
+    distance = np.sqrt(np.power(dif_x,2) + np.power(dif_y,2))
+    #print('distance: %f m' % distance)
+    #print('distance between Y1 and Y2: %f m' % dif_y)
+    difference_time = last_time - initial_time
+    #print(difference_time)
+    velocity = (distance / difference_time) *3.6 #km/h
+    
+    
+    return velocity
     
 
 def BigDirection(firstimagefile,lastimagefile,gpsfile): #最初の角度yawはこれ！
@@ -1093,7 +1166,7 @@ def imageCoordinate_for_modify(imagefile,gpsfile,offsetDistance,offsetAngle,scan
     #print('y_resolution = %f m' % y_resolution)
 
     #print(bottom)
-    L = y_resolution * 612  #m/pix * pix = m 最初の2項は新たな画像におけるresolution
+    L = y_resolution * 512  #m/pix * pix = m 最初の2項は新たな画像におけるresolution
     converter = Proj(proj='utm',zone=54,ellps='GRS80')
     utm_X, utm_Y = converter(bottom[1],bottom[0])
     centreX = utm_X - L * np.sin(ang)
@@ -1141,15 +1214,15 @@ def imageCoordinate_for_big(imagefile,gpsfile,offsetDistance,offsetAngle,scanrat
     centre_X = top_X + L * np.sin(ang)
     centre_Y = top_Y - L * np.cos(ang)
     
-    topleftX = centreX - (x_resolution * rotated_y_pixel // 2)
-    topleftY = centreY + (y_resolution * rotated_y_pixel // 2)
-    bottomrightX = centreX + (x_resolution * rotated_y_pixel // 2)
-    bottomrightY = centreY - (y_resolution * rotated_y_pixel // 2)
+    topleftX = centre_X - (x_resolution * rotated_y_pixel // 2)
+    topleftY = centre_Y + (y_resolution * rotated_y_pixel // 2)
+    bottomrightX = centre_X + (x_resolution * rotated_y_pixel // 2)
+    bottomrightY = centre_Y - (y_resolution * rotated_y_pixel // 2)
     #print(topleftX,topleftY)    
     
-    topleftasE,topleftN = converter(topleftX,topleftY,inverse=True)
+    topleftE,topleftN = converter(topleftX,topleftY,inverse=True)
     bottomrightE,bottomrightN = converter(bottomrightX,bottomrightY,inverse=True)
-    '''
+    
     print('topleftN')
     print(topleftN)
     print('topleftE')
@@ -1158,7 +1231,7 @@ def imageCoordinate_for_big(imagefile,gpsfile,offsetDistance,offsetAngle,scanrat
     print(bottomrightN)
     print('bottomrightE')
     print(bottomrightE)
-    '''
+    
     return topleftN,topleftE,bottomrightN,bottomrightE
 
 def MakeRasterRGBA(filename,scanrate,speed,Lat,Lon,yaw,tiffname):
